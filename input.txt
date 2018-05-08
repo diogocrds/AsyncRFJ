@@ -1,0 +1,17 @@
+class C extends Object {
+    int w;
+    C(int w) { 
+        super();
+        this.w = w;
+    }
+    
+}
+
+{(words,v),(MouseX,2),(MouseY,16),(ib,true)}
+
+{(MouseY,1),(MouseY,2)}
+
+let x = 9
+in let a = lift ((boolean b,int y) -> y+1) (ib,lift ((int x,int y)->x+y) (MouseX,MouseY))
+in let g = lift ((boolean z) -> z) (ib) 
+in let h = lift ((int z) -> z+10) (MouseX) in h;
