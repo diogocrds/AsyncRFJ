@@ -32,6 +32,8 @@ import Data.Map
     false	{ TokenKWFalse }
     int     { TokenKWInt }
     lift    { TokenKWLift }
+    foldp    { TokenKWFoldp }
+    async    { TokenKWAsync }
 -- Caracteres especiais
     '{'		{ TokenLBrace }
     '}'		{ TokenRBrace }
@@ -178,7 +180,9 @@ Term		: BooleanLiteral								{ BooleanLiteral $1 }
         | Term '/' Term                                     { Divide $1 $3 }
         | Term '+' Term                                     { Plus $1 $3 }
         | Term '-' Term                                     { Minus $1 $3 }
-        | lift '(' '(' ParamList ')' "->" Term ')' '(' TermList ')' { Lift $4 $7 $10 }
+        | lift '(' '(' ParamList ')' "->" Term ')' '(' TermList ')'   { Lift $4 $7 $10 }
+        | foldp '(' '(' ParamList ')' "->" Term ')' Term '(' Term ')' { Foldp $4 $7 $9 $11 }
+        | async Term                                        { Async $2 }
 
 
 
@@ -253,6 +257,8 @@ data Term		= EmptyTerm
             | Minus Term Term
             | Plus Term Term
             | Lift [(Type,String)] Term [Term]
+            | Foldp [(Type,String)] Term Term Term
+            | Async Term
             | SignalTerm Term
                        deriving (Show,Eq)
 
@@ -323,6 +329,8 @@ data Token		= TokenKWClass
 			| TokenName String
 			| TokenNumber Int
             | TokenKWLift
+            | TokenKWFoldp
+            | TokenKWAsync
 			deriving (Show)
 
 -- Leitura de código fonte e transformação em lista de Tokens (análise léxica)
@@ -377,6 +385,8 @@ lexStr cs = case span isAlpha cs of
 		("false", rest)		-> TokenKWFalse : lexer rest
 		("int", rest)		-> TokenKWInt : lexer rest
 		("lift", rest)		-> TokenKWLift : lexer rest
+		("foldp", rest)		-> TokenKWFoldp : lexer rest
+		("async", rest)		-> TokenKWAsync : lexer rest
 		(name, rest)		-> TokenName name : lexer rest
 
 lexDigit cs = case span isDigit cs of

@@ -9,9 +9,7 @@ class C extends Object {
 
 {(words,v),(MouseX,2),(MouseY,16),(ib,true)}
 
-{(MouseY,1),(MouseY,2)}
+{(MouseX,10),(MouseX,20)}
 
-let x = 9
-in let a = lift ((boolean b,int y) -> y+1) (ib,lift ((int x,int y)->x+y) (MouseX,MouseY))
-in let g = lift ((boolean z) -> z) (ib) 
-in let h = lift ((int z) -> z+10) (MouseX) in h;
+let x = lift ((int x) -> x+2) (MouseX)
+in lift ((int z) -> z+3) (async x);

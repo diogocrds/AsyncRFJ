@@ -101,5 +101,5 @@ isValue _ _ = False
 isSignalValue :: Term -> Bool
 isSignalValue (SignalTerm (BooleanLiteral t)) = True
 isSignalValue (SignalTerm (Int t)) = True
-isSignalValue (SignalTerm (Var t)) = True
+isSignalValue (SignalTerm (Var t)) = False
 isSignalValue _ = False

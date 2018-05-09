@@ -171,7 +171,17 @@ typeof ctx ct input (Lift p e t) = -- T-Lift
           in case (typeof ctx' ct input e) of
             Right t -> Right (SignalType t)
         else error "Lift: miss-match type of parameters"
-    else error "Lift miss-matched number of parameters"
+    else error "Lift: miss-matched number of parameters"
+typeof ctx ct input (Foldp p e acc t) = -- T-Foldp
+    if ((Data.List.length p)==2) then
+    let p' = Data.List.zipWith (\(tp,_) tE -> (tp,(typeof ctx ct input tE))) p ([t]++[acc]) in
+      if (Data.List.all (\(p1,p2) -> (p1==(getRight p2))) p') then
+        let ctx' = Data.Map.union (Data.Map.fromList (Data.List.map (\(t,n) -> (n,t)) p)) ctx
+        in case (typeof ctx' ct input e) of
+          Right t -> Right (SignalType t)
+      else error "Foldp: miss-match type of parameters"
+    else error "Foldp: miss-matched number of parameters"
+typeof ctx ct input (Async e) = typeof ctx ct input e
 typeof ctx ct input _ = error "type not found"
 
 getRight :: (Either TypeError Type) -> Type
