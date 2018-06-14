@@ -31,6 +31,7 @@ import Data.Map
     true	{ TokenKWTrue }
     false	{ TokenKWFalse }
     int     { TokenKWInt }
+    string     { TokenKWString }
     lift    { TokenKWLift }
     foldp    { TokenKWFoldp }
     async    { TokenKWAsync }
@@ -51,6 +52,7 @@ import Data.Map
     '+'		{ TokenPlus }
     '-'		{ TokenMinus }
     "=="    { TokenEqual }
+    '"'      { TokenQuote }
 -- Nomes definidos pelo programador (classes, metodos, atributos)
     name	{ TokenName $$ }
     number	{ TokenNumber $$ }
@@ -126,10 +128,11 @@ IdentStmt	: TypeDef name									{ ($1,$2) }
 
 -- Definicao de tipos
 TypeDef		: boolean									    { TypeBool }
+        | string                                            { TypeString }
 		| ClassName								            { TypeClass $1 }
 		| '(' TypeList "->" TypeDef ')'						{ TypeClosure $4 $2 }
 		| '{' TypeList '}'								    { TypeTuple $2 }
-        | int                                             { TypeInt }
+        | int                                               { TypeInt }
 
 -- Lista de tipos utilizados para as Closures
 TypeList 	: {- empty -}									{ [] }
@@ -161,6 +164,7 @@ TermList	: {- empty -}									{ [] }
 -- Termos (utilizados no corpo dos métodos)
 Term		: BooleanLiteral								{ BooleanLiteral $1 }
 		| name										        { Var $1 }
+        | '"' name '"'                                      { Str $2 }
 		| this '.' name									    { ThisAccessAttr $3 }
 		| this '.' name '(' TermList ')'					{ ThisAccessMeth $3 $5 }
 		| Term '.' name									    { AttrAccess $1 $3 }
@@ -238,6 +242,7 @@ data Term		= EmptyTerm
 			| BooleanLiteral BooleanLiteral
             | Int Int
 			| Var String
+            | Str String
 			| ThisAccessAttr String
 			| ThisAccessMeth String [Term]
 			| AttrAccess Term String
@@ -279,6 +284,7 @@ data Status		= Change Term
             deriving (Show, Eq)
 
 data Type		= TypeBool
+            | TypeString
 			| TypeClass String
 			| TypeClosure Type [Type]
 			| TypeTuple [Type]
@@ -306,6 +312,7 @@ data Token		= TokenKWClass
 			| TokenKWTrue
 			| TokenKWFalse
             | TokenKWInt
+            | TokenKWString
 			| TokenKWMZero
 			| TokenKWMReturn
 			| TokenKWMPlus
@@ -316,6 +323,7 @@ data Token		= TokenKWClass
 			| TokenPlus
 			| TokenMinus
 			| TokenEqual
+			| TokenQuote
 			| TokenLBrace
 			| TokenRBrace
 			| TokenLParen
@@ -362,6 +370,7 @@ lexer ('.':cs) = TokenDot : lexer cs
 lexer ('+':cs) = TokenPlus : lexer cs
 lexer ('/':cs) = TokenDivide : lexer cs
 lexer ('*':cs) = TokenTimes : lexer cs
+lexer ('"':cs) = TokenQuote : lexer cs
 lexer (c:cs)	| isSpace c = lexer cs
 		| isAlpha c = lexStr (c:cs)
 		| isDigit c = lexDigit (c:cs)
@@ -384,6 +393,7 @@ lexStr cs = case span isAlpha cs of
 		("true", rest)		-> TokenKWTrue : lexer rest
 		("false", rest)		-> TokenKWFalse : lexer rest
 		("int", rest)		-> TokenKWInt : lexer rest
+		("string", rest)		-> TokenKWString : lexer rest
 		("lift", rest)		-> TokenKWLift : lexer rest
 		("foldp", rest)		-> TokenKWFoldp : lexer rest
 		("async", rest)		-> TokenKWAsync : lexer rest

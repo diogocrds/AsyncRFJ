@@ -95,11 +95,12 @@ isValue :: CT -> Term -> Bool
 isValue _ (CreateObject c []) = True
 isValue ct (CreateObject c p) = Data.List.all (isValue ct) p
 isValue ct (BooleanLiteral t) = True
+isValue ct (Str t) = True
 isValue ct (Int t) = True
 isValue _ _ = False
 
 isSignalValue :: Term -> Bool
 isSignalValue (SignalTerm (BooleanLiteral t)) = True
 isSignalValue (SignalTerm (Int t)) = True
-isSignalValue (SignalTerm (Var t)) = False
+isSignalValue (SignalTerm (Str t)) = True
 isSignalValue _ = False

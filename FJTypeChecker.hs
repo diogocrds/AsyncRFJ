@@ -33,6 +33,7 @@ throwError e = Left e
 -----------------------------------------------------
 typeof :: Env -> CT -> Input -> Term -> Either TypeError Type
 typeof ctx ct input (Int i) = Right (TypeInt)
+typeof ctx ct input (Str i) = Right (TypeString)
 typeof ctx ct input (Plus a b) =
   case (typeof ctx ct input a) of
     (Right TypeInt) -> case (typeof ctx ct input b) of
@@ -78,6 +79,7 @@ typeof ctx ct input (Var v) = -- T-Var
     Just (Var t,_,_) -> Right (SignalType (TypeClass v))
     Just (BooleanLiteral t,_,_) -> Right (SignalType TypeBool)
     Just (Int t,_,_) -> Right (SignalType TypeInt)
+    Just (Str t,_,_) -> Right (SignalType TypeString)
     _ -> case (Data.Map.lookup v ctx) of 
            Just var -> return var
            _ -> throwError (VariableNotFound v) 
@@ -170,7 +172,7 @@ typeof ctx ct input (Lift p e t) = -- T-Lift
           let ctx' = Data.Map.union (Data.Map.fromList (Data.List.map (\(t,n) -> (n,t)) p)) ctx
           in case (typeof ctx' ct input e) of
             Right t -> Right (SignalType t)
-        else error "Lift: miss-match type of parameters"
+        else error ("Lift: miss-match type of parameters"++(show p'))
     else error "Lift: miss-matched number of parameters"
 typeof ctx ct input (Foldp p e acc t) = -- T-Foldp
     if ((Data.List.length p)==2) then
@@ -191,6 +193,7 @@ getRight (Right (TypeInt)) = TypeInt
 getRight (Right (SignalType (TypeClass tp))) = (TypeClass tp)
 getRight (Right (SignalType TypeBool)) = TypeBool
 getRight (Right (SignalType TypeInt)) = TypeInt
+getRight (Right (SignalType TypeString)) = TypeString
 getRight (Left (VariableNotFound e)) = error ("Var Error: Declaration not Found."++(show e))
 getRight (Left (ParamsTypeMismatch e)) = error "CreateObject Error: Parameters miss-match."
 getRight _ = error "nt r"

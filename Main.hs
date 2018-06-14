@@ -38,29 +38,18 @@ checkTerm ct i t =
                Right (TypeClass t) -> True
                Right (TypeBool) -> True
                Right (TypeInt) -> True
+               Right (TypeString) -> True
+               Right (TypeClosure e t) -> True
                Right (SignalType (TypeClass t)) -> True
                Right (SignalType TypeBool) -> True
                Right (SignalType TypeInt) -> True
+               Right (SignalType TypeString) -> True
                Left (VariableNotFound e) -> error ("Var Error: Declaration not Found. "++(show e))
                Left (ParamsTypeMismatch e) -> error ("Error: Parameters miss-match. "++(show e))
                Left (ClassNotFound e) -> error ("Error: Class not Found. "++(show e))
                Left (FieldNotFound e) -> error ("Error: Field Not Found. "++(show e))
                Left (MethodNotFound e s) -> error ("Error: Method Not Found. "++(show e)++", "++(show s))
                t -> error ("Error: "++(show t))
-x = Data.Map.fromList [(1,("um",-1)),(2,("d",2)),(3,("t",-1))]
---(Data.Map.mapMaybe ( \(v,i)-> if (i == -1) then (Just (v,i)) else (Just (v,i+1)) ) x)
---(Data.Map.updateAt (\ _ _ -> Just "x") (Data.Map.findIndex 3 x) x)
---(Data.Map.mapWithKey (\id (s,i) -> if id ==2 then (s,i+20) else (s,i)) x)
---[[Change (Int 4),Change (Int 3),NoChange (BooleanLiteral BLTrue),NoChange (Int 12)],[Change (Int 5),Change (Int 4),NoChange (BooleanLiteral BLTrue),NoChange (Int 12)]]
-main = do readFile "input.txt" >>= print.evalEvent.evalInit.typecheck.parser.lexer
-    
 
---[(words,""), (mouse.x,0), (mouse.y,0), (Keyboard.shift,true)]
-
---lift (,) words (lift toFrench words)
-
---[("bola",1), (22,2), (10,3), ("casa",1)]
-
---lift ((boolean x,int w, int y) -> if (x) { w+y } else { w-y }) (false,3,5);
---((boolean x,int w, int y) -> if (x) { w+y } else { w-y }).invoke(false,3,5);
---let x = 2 in if (true) {x+2} else {x-2};
+main = do readFile "input.txt" >>= print.printType.typecheck.parser.lexer
+--print.evalEvent.evalInit.typecheck.parser.lexer
