@@ -162,12 +162,11 @@ typeof ctx ct input (ClosureDef p t) = -- T-Lam
       ctx' = Data.Map.union (Data.Map.fromList p') ctx in
     case (typeof ctx' ct input t) of
       Right t -> Right (TypeClosure t tp')
-typeof ctx ct input (InvokeClosure c t) = -- T-Invok
-  case c of
-  (ClosureDef p t1) -> if ((Data.List.length p)==(Data.List.length t)) then
+typeof ctx ct input (InvokeClosure c@(ClosureDef p t1) t) = -- T-Invok
+  if ((Data.List.length p)==(Data.List.length t)) then
     case (typeof ctx ct input c) of
       Right (TypeClosure r p) ->  Right r
-    else error "Closure: params miss-match"
+  else error "Closure: params miss-match"
 typeof ctx ct input (Lift p e t) = -- T-Lift
     if ((Data.List.length p)==(Data.List.length t)) then
       let p' = Data.List.zipWith (\(tp,_) tE -> (tp,(typeof ctx ct input tE))) p t in
