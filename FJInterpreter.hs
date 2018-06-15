@@ -25,13 +25,14 @@ data TypedProgram = TypedProgram { env :: [(String, Term)] , ct :: CT , i :: Inp
 eval' :: EnvG -> CT -> Input -> Int -> Term -> EProgram
 eval' ctx ct input numT (CreateObject c p) = -- RC-New-Arg
   let p' = Data.List.map (\x -> case (eval' ctx ct input numT x) of EProgram (Just x') t -> x') p in (EProgram (Just (CreateObject c p')) [])
-eval' ctx ct input numT (Var v) = case (Data.Map.lookup v input) of Just (v',_,_) -> EProgram (Just (SignalTerm v')) [] 
-                                                                    Nothing -> EProgram (Data.Map.lookup v ctx) []
-eval' ctx ct input numT (SignalTerm (Var v)) = case eval' ctx ct input numT (Var v) of (EProgram (Just v) t) -> EProgram (Just v) t--EProgram (Just (SignalTerm (Var v))) []
-eval' ctx ct input numT (SignalTerm (Int v)) = EProgram (Just (SignalTerm (Int v))) []
-eval' ctx ct input numT (SignalTerm (BooleanLiteral v)) = EProgram (Just (SignalTerm (BooleanLiteral v))) []
-eval' ctx ct input numT (Int v) = EProgram (Just (Int v)) []
-eval' ctx ct input numT (BooleanLiteral b) = EProgram (Just (BooleanLiteral b)) []
+eval' ctx ct input numT (Var v) = 
+  case (Data.Map.lookup v input) of 
+    Just (v',_,_) -> EProgram (Just (SignalTerm v')) [] 
+    Nothing -> EProgram (Data.Map.lookup v ctx) []
+eval' ctx ct input numT (SignalTerm (Var v)) = 
+  case eval' ctx ct input numT (Var v) of 
+    (EProgram (Just v) t) -> (EProgram (Just v) t)
+    _ -> (EProgram (Just (Var v)) [])
 eval' ctx ct input numT (Plus a b) = -- R-Plus
   case a of
     (Int a') -> case b of
@@ -84,7 +85,7 @@ eval' ctx ct input numT (AttrAccess e f) =
           Just flds -> 
             case (Data.List.findIndex (\(tp,nm) -> f == nm) flds) of
               Just idx -> EProgram (Just (p !! idx)) []
-  else --error ("=="++(show(e))) -- RC-Field
+  else -- RC-Field
     case (eval' ctx ct input numT e) of 
       EProgram (Just e') t -> EProgram (Just (AttrAccess e' f)) t
       _ -> EProgram Nothing []
@@ -113,16 +114,14 @@ eval' ctx ct input numT (MethodAccess e m p) =
       Just e' -> Just (Cast c e')
       _ -> Nothing -}
 eval' ctx ct input numT (Let v e1 e2) = 
-  let e1' = eval ctx ct input numT e1 -- R-Let
+  let e1' = eval' ctx ct input numT e1 -- R-Let
     in case e1 of
         (Lift p e t) -> 
           case e1' of
-          (EProgram (Just (SignalTerm e'')) t') -> 
+          (EProgram (Just (SignalTerm e'')) t') ->
             let input' = (Data.Map.insert v (e'',NoChange e'',numT+1) input) 
             in case (eval' ctx ct input' (numT+(length t')) e2) of
-                (EProgram (Just e2') t'') -> 
-                  let t''' = (Data.List.map (\(Thread id ctx ct input t i) -> (Thread id ctx ct input t i)) t'')
-                  in EProgram (Just e2') (t'++t''')
+                (EProgram (Just e2') t'') -> EProgram (Just e2') (t'++t'')
         _ -> case e1' of
              (EProgram (Just (SignalTerm e)) t) -> let input' = (Data.Map.insert v (e,NoChange e,-1) input) 
                                                    in case (eval' ctx ct input' numT e2) of
@@ -133,7 +132,7 @@ eval' ctx ct input numT (If a e1 e2) = -- R-If
       EProgram (Just a') t -> if (a'==(BooleanLiteral BLTrue)) then (eval' ctx ct input numT e1) else (eval' ctx ct input numT e2)
 eval' ctx ct input numT (ClosureDef p t) = EProgram (Just (ClosureDef p t)) [] -- R-Closure
 eval' ctx ct input numT (InvokeClosure (ClosureDef par e) t) = -- R-InvokeClosure
-    let p' = Data.List.zipWith (\(ty,var) (val) -> (var,val)) par t
+    let p' = Data.List.zipWith (\(ty,var) (val) -> case (eval' ctx ct input numT val) of (EProgram (Just val') t) -> (var,val')) par t
         ctx' = Data.Map.union (Data.Map.fromList p') ctx
     in eval' ctx' ct input numT e
 eval' ctx ct input numT l@(Lift p e t) = -- R-Lift
@@ -148,6 +147,7 @@ eval' ctx ct input numT f@(Foldp p e acc t) = -- R-Foldp
   in case res' of
       (EProgram (Just (SignalTerm e')) t'') -> let tList = (Thread (numT+1) ctx ct input' f [0]) in EProgram (Just (SignalTerm e')) ([tList]++t'++t'')
       (EProgram (Just e') t'') -> let tList = (Thread (numT+1) ctx ct input' f [0]) in EProgram (Just (SignalTerm e')) ([tList]++t'++t'')
+eval' ctx ct input numT (SignalTerm (Async e)) = eval' ctx ct input numT (Async e)-- R-Async
 eval' ctx ct input numT a@(Async e) = -- R-Async
   let t' = case (eval' ctx ct input (numT+1) e) of (EProgram ev tr) -> tr
       res' = (eval' ctx ct input (numT+1+(length t')) e)
@@ -155,6 +155,7 @@ eval' ctx ct input numT a@(Async e) = -- R-Async
   in case res' of
       (EProgram (Just (SignalTerm e')) t'') -> let tList = (Thread (numT+1) ctx ct input' a [0]) in EProgram (Just (SignalTerm e')) ([tList]++t'++t'')
       (EProgram (Just e') t'') -> let tList = (Thread (numT+1) ctx ct input' a [0]) in EProgram (Just (SignalTerm e')) ([tList]++t'++t'')
+      _ -> error ("e: "++(show e)++"/"++(show input)++"/"++(show res'))
 eval' _ _ _ numT t = error ("cant eval "++(show t))--EProgram Nothing []
 
 evalOperation :: Term -> Int
