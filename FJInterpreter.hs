@@ -10,7 +10,7 @@ import Data.Maybe
 import Data.List
 import Data.Map
 
-data Thread = Thread Int EnvG CT Input Term [Int]
+data Thread = Thread Int EnvG CT Input Term
             | ThreadNull
             deriving (Show,Eq)
 
@@ -25,6 +25,10 @@ data TypedProgram = TypedProgram { env :: [(String, Term)] , ct :: CT , i :: Inp
 eval' :: EnvG -> CT -> Input -> Int -> Term -> EProgram
 eval' ctx ct input numT (CreateObject c p) = -- RC-New-Arg
   let p' = Data.List.map (\x -> case (eval' ctx ct input numT x) of EProgram (Just x') t -> x') p in (EProgram (Just (CreateObject c p')) [])
+eval' ctx ct input numT (SignalTerm (Int v)) = EProgram (Just (SignalTerm (Int v))) []
+eval' ctx ct input numT (SignalTerm (BooleanLiteral v)) = EProgram (Just (SignalTerm (BooleanLiteral v))) []
+eval' ctx ct input numT (Int v) = EProgram (Just (Int v)) []
+eval' ctx ct input numT (BooleanLiteral b) = EProgram (Just (BooleanLiteral b)) []
 eval' ctx ct input numT (Var v) = 
   case (Data.Map.lookup v input) of 
     Just (v',_,_) -> EProgram (Just (SignalTerm v')) [] 
@@ -122,10 +126,22 @@ eval' ctx ct input numT (Let v e1 e2) =
             let input' = (Data.Map.insert v (e'',NoChange e'',numT+1) input) 
             in case (eval' ctx ct input' (numT+(length t')) e2) of
                 (EProgram (Just e2') t'') -> EProgram (Just e2') (t'++t'')
+        (Foldp p e acc t) -> 
+          case e1' of
+          (EProgram (Just (SignalTerm e'')) t') ->
+            let input' = (Data.Map.insert v (e'',NoChange e'',numT+1) input) 
+            in case (eval' ctx ct input' (numT+(length t')) e2) of
+                (EProgram (Just e2') t'') -> EProgram (Just e2') (t'++t'')
+        (Async e) -> 
+          case e1' of
+          (EProgram (Just (SignalTerm e'')) t') ->
+            let input' = (Data.Map.insert v (e'',NoChange e'',numT+1) input) 
+            in case (eval' ctx ct input' (numT+(length t')) e2) of
+                (EProgram (Just e2') t'') -> EProgram (Just e2') (t'++t'')
         _ -> case e1' of
-             (EProgram (Just (SignalTerm e)) t) -> let input' = (Data.Map.insert v (e,NoChange e,-1) input) 
-                                                   in case (eval' ctx ct input' numT e2) of
-                                                      (EProgram e2' t') -> EProgram e2' (t++t')
+             (EProgram (Just (SignalTerm e)) t) -> 
+               let input' = (Data.Map.insert v (e,NoChange e,-1) input) 
+               in case (eval' ctx ct input' numT e2) of (EProgram e2' t') -> EProgram e2' (t++t')
              (EProgram (Just e) t) -> let ctx' = (Data.Map.insert v e ctx) in (eval ctx' ct input numT e2)
 eval' ctx ct input numT (If a e1 e2) = -- R-If
     case (eval ctx ct input numT a) of 
@@ -138,25 +154,25 @@ eval' ctx ct input numT (InvokeClosure (ClosureDef par e) t) = -- R-InvokeClosur
 eval' ctx ct input numT l@(Lift p e t) = -- R-Lift
   let t' = (Data.List.map (\x -> case (eval' ctx ct input (numT+1) x) of EProgram (Just x') r -> r) t)
   in case (eval' ctx ct input (numT+1+(length t')) (InvokeClosure (ClosureDef p e) t)) of
-      (EProgram (Just (SignalTerm e')) t'') -> let tList = (Thread (numT+1) ctx ct input l [0]) in EProgram (Just (SignalTerm e')) ([tList]++(Data.List.concat t')++t'')
-      (EProgram (Just e') t'') -> let tList = (Thread (numT+1) ctx ct input l [0]) in EProgram (Just (SignalTerm e')) ([tList]++(Data.List.concat t')++t'')
+      (EProgram (Just (SignalTerm e')) t'') -> let tList = (Thread (numT+1) ctx ct input l) in EProgram (Just (SignalTerm e')) ([tList]++(Data.List.concat t')++t'')
+      (EProgram (Just e') t'') -> let tList = (Thread (numT+1) ctx ct input l) in EProgram (Just (SignalTerm e')) ([tList]++(Data.List.concat t')++t'')
 eval' ctx ct input numT f@(Foldp p e acc t) = -- R-Foldp
   let t' = case (eval' ctx ct input (numT+1) t) of (EProgram ev tr) -> tr
       res' = (eval' ctx ct input (numT+1+(length t')) (InvokeClosure (ClosureDef p e) ([t]++[acc])))
       input' = case res' of (EProgram (Just rres) tres) -> (Data.Map.insert "acc" (rres,NoChange rres,-1) input) 
   in case res' of
-      (EProgram (Just (SignalTerm e')) t'') -> let tList = (Thread (numT+1) ctx ct input' f [0]) in EProgram (Just (SignalTerm e')) ([tList]++t'++t'')
-      (EProgram (Just e') t'') -> let tList = (Thread (numT+1) ctx ct input' f [0]) in EProgram (Just (SignalTerm e')) ([tList]++t'++t'')
+      (EProgram (Just (SignalTerm e')) t'') -> let tList = (Thread (numT+1) ctx ct input' f) in EProgram (Just (SignalTerm e')) ([tList]++t'++t'')
+      (EProgram (Just e') t'') -> let tList = (Thread (numT+1) ctx ct input' f) in EProgram (Just (SignalTerm e')) ([tList]++t'++t'')
 eval' ctx ct input numT (SignalTerm (Async e)) = eval' ctx ct input numT (Async e)-- R-Async
 eval' ctx ct input numT a@(Async e) = -- R-Async
   let t' = case (eval' ctx ct input (numT+1) e) of (EProgram ev tr) -> tr
       res' = (eval' ctx ct input (numT+1+(length t')) e)
       input' = case res' of (EProgram (Just rres) tres) -> (Data.Map.insert "async" (rres,NoChange rres,-1) input) 
   in case res' of
-      (EProgram (Just (SignalTerm e')) t'') -> let tList = (Thread (numT+1) ctx ct input' a [0]) in EProgram (Just (SignalTerm e')) ([tList]++t'++t'')
-      (EProgram (Just e') t'') -> let tList = (Thread (numT+1) ctx ct input' a [0]) in EProgram (Just (SignalTerm e')) ([tList]++t'++t'')
+      (EProgram (Just (SignalTerm e')) t'') -> let tList = (Thread (numT+1) ctx ct input' a) in EProgram (Just (SignalTerm e')) ([tList]++t'++t'')
+      (EProgram (Just e') t'') -> let tList = (Thread (numT+1) ctx ct input' a) in EProgram (Just (SignalTerm e')) ([tList]++t'++t'')
       _ -> error ("e: "++(show e)++"/"++(show input)++"/"++(show res'))
-eval' _ _ _ numT t = error ("cant eval "++(show t))--EProgram Nothing []
+eval' _ _ _ numT t = EProgram Nothing []--error ("cant eval "++(show t))
 
 evalOperation :: Term -> Int
 evalOperation (Plus (Int a) (Int b)) = a+b
@@ -166,21 +182,21 @@ evalOperation (Times (Int a) (Int b)) = a*b
 evalOperation t = error ("op: "++(show t))
 
 findThreadById :: [Thread] -> Int -> Thread
-findThreadById (h@(Thread i ctx ct input term ti):hs) id = if (i == id) then h else (findThreadById hs id)
+findThreadById (h@(Thread i ctx ct input term):hs) id = if (i == id) then h else (findThreadById hs id)
 findThreadById [] id = error "Thread not found."
 
 findThreadByTerm :: [Thread] -> Term -> Thread
-findThreadByTerm (h@(Thread i ctx ct input term ti):hs) t = if (term == t) then h else (findThreadByTerm hs t)
+findThreadByTerm (h@(Thread i ctx ct input term):hs) t = if (term == t) then h else (findThreadByTerm hs t)
 findThreadByTerm [] term = error "Thread not found."
 
 extThreads :: [Thread] -> [Thread] -> (String,Term) -> [(Status,Thread)]
-extThreads allT (t@(Thread id ctx ct input term ti):ts) ged = 
+extThreads allT (t@(Thread id ctx ct input term):ts) ged = 
   case (extSingleThread allT t ged) of
-    (s,i) -> [(s,(Thread id ctx ct i term ti))]++(extThreads allT ts ged)
+    (s,i) -> [(s,(Thread id ctx ct i term))]++(extThreads allT ts ged)
 extThreads allT [] ged = []
 
 extSingleThread :: [Thread] -> Thread -> (String, Term) -> (Status,Input)
-extSingleThread allT (Thread id ctx ct input term ti) (v,t) = 
+extSingleThread allT (Thread id ctx ct input term) (v,t) = 
   let old = Data.Map.map (\(t0,st,tr)->case st of Change v -> (t0,NoChange v, tr)
                                                   NoChange v -> (t0,NoChange v, tr)) input
       input' = Data.Map.mapWithKey (\idT (t0,(NoChange st),tr) -> if (idT == v) then (t0,(Change t),tr) else (t0,(NoChange st),tr)) old
