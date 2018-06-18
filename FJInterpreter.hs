@@ -271,13 +271,18 @@ evalSignal ctx ct input (Foldp p e acc e1) v event = --R-ThreadFoldp
                        (NoChange v',i) -> (Change v',input')
      else res'
 evalSignal ctx ct input (Async e) v event = --R-ThreadAsync
-  case (Data.Map.lookup "async" input) of 
-    Just (t0,(NoChange async'),tr) -> let e1'' = (evalSignal ctx ct input e v event)
-                                          e1' = (case e1'' of (x,i) -> x)
-                                          newE1 = (getStatus e1')
-                                          input' = Data.Map.mapWithKey (\idT (t0,st,tr) -> if (idT=="async") then (t0,(NoChange newE1),tr) else (t0,st,tr)) input
-                                      in (NoChange async',input')
-    _ -> case (findThreadByTerm v (Async e)) of (thr) -> executeSingleThread v thr event
+  let e1'' = (evalSignal ctx ct input e v event)
+      e1' = (case e1'' of (x,i) -> x)
+      newE1 = (getStatus e1')
+      async' = case (Data.Map.lookup "async" input) of 
+        Just (t0,a',tr) -> getStatus a'
+        _ -> case (findThreadByTerm v (Async e)) of 
+          (thr) -> case (executeSingleThread v thr event) of 
+            (a',_) -> getStatus a'
+      input' = Data.Map.mapWithKey (\idT (t0,st,tr) ->
+                 if (idT=="async") then (t0,(NoChange newE1),tr) 
+                 else (t0,st,tr)) input
+  in (NoChange async',input')
 
 evalEvents :: (EProgram, [(String,Term)]) -> [[Status]]
 evalEvents ((EProgram (Just e) t), (g:gs)) = 
