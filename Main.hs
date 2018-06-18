@@ -16,7 +16,7 @@ printEval :: (EProgram,[(String,Term)]) -> String
 printEval ((EProgram (Just e) t),ged) = (show e)++(printThreads t)++"\n\n GED ="++(show ged)
 
 printThreads :: [Thread] -> String
-printThreads ((Thread id ctx ct input term ti):hs) = ("\n\n=> Thread "++(show id)++"\n Contex: "++(show ctx)++"\n CT: "++(show ct)++"\n Input: "++(show input)++"\n Term: "++(show term)++"\n T: "++(show ti))++(printThreads hs)
+printThreads ((Thread id ctx ct input term):hs) = ("\n\n=> Thread "++(show id)++"\n Contex: "++(show ctx)++"\n CT: "++(show ct)++"\n Input: "++(show input)++"\n Term: "++(show term))++(printThreads hs)
 printThreads [] = "."
 
 typecheck :: Program -> TypedProgram
@@ -51,5 +51,5 @@ checkTerm ct i t =
                Left (MethodNotFound e s) -> error ("Error: Method Not Found. "++(show e)++", "++(show s))
                t -> error ("Error: "++(show t))
 
-main = do readFile "input.txt" >>= print.printType.typecheck.parser.lexer
+main = do readFile "input.txt" >>= print.evalEvents.evalInit.typecheck.parser.lexer
 --print.evalEvent.evalInit.typecheck.parser.lexer

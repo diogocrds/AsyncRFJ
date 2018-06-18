@@ -189,14 +189,14 @@ findThreadByTerm :: [Thread] -> Term -> Thread
 findThreadByTerm (h@(Thread i ctx ct input term):hs) t = if (term == t) then h else (findThreadByTerm hs t)
 findThreadByTerm [] term = error "Thread not found."
 
-extThreads :: [Thread] -> [Thread] -> (String,Term) -> [(Status,Thread)]
-extThreads allT (t@(Thread id ctx ct input term):ts) ged = 
-  case (extSingleThread allT t ged) of
-    (s,i) -> [(s,(Thread id ctx ct i term))]++(extThreads allT ts ged)
-extThreads allT [] ged = []
+executeThreads :: [Thread] -> [Thread] -> (String,Term) -> [(Status,Thread)]
+executeThreads allT (t@(Thread id ctx ct input term):ts) ged = 
+  case (executeSingleThread allT t ged) of
+    (s,i) -> [(s,(Thread id ctx ct i term))]++(executeThreads allT ts ged)
+executeThreads allT [] ged = []
 
-extSingleThread :: [Thread] -> Thread -> (String, Term) -> (Status,Input)
-extSingleThread allT (Thread id ctx ct input term) (v,t) = 
+executeSingleThread :: [Thread] -> Thread -> (String, Term) -> (Status,Input)
+executeSingleThread allT (Thread id ctx ct input term) (v,t) = 
   let old = Data.Map.map (\(t0,st,tr)->case st of Change v -> (t0,NoChange v, tr)
                                                   NoChange v -> (t0,NoChange v, tr)) input
       input' = Data.Map.mapWithKey (\idT (t0,(NoChange st),tr) -> if (idT == v) then (t0,(Change t),tr) else (t0,(NoChange st),tr)) old
@@ -207,7 +207,7 @@ evalSignal ctx ct input (SignalTerm e) v event = evalSignal ctx ct input e v eve
 --evalSignal ctx ct input (CreateObject c p) v =
 evalSignal ctx ct input (Var e) v event = 
   case (Data.Map.lookup e input) of 
-    Just (t,s,i) -> if (i == -1) then (s,input) else case (findThreadById v i) of (thr) -> extSingleThread v thr event
+    Just (t,s,i) -> if (i == -1) then (s,input) else case (findThreadById v i) of (thr) -> executeSingleThread v thr event
     Nothing -> case (Data.Map.lookup e ctx) of
                 Just e' -> (NoChange e',input)
                 Nothing -> error "Var not found"
@@ -277,15 +277,15 @@ evalSignal ctx ct input (Async e) v event = --R-ThreadAsync
                                           newE1 = (getStatus e1')
                                           input' = Data.Map.mapWithKey (\idT (t0,st,tr) -> if (idT=="async") then (t0,(NoChange newE1),tr) else (t0,st,tr)) input
                                       in (NoChange async',input')
-    _ -> case (findThreadByTerm v (Async e)) of (thr) -> extSingleThread v thr event
+    _ -> case (findThreadByTerm v (Async e)) of (thr) -> executeSingleThread v thr event
 
-evalEvent :: (EProgram, [(String,Term)]) -> [[Status]]
-evalEvent ((EProgram (Just e) t), (g:gs)) = 
-  let thisT = (extThreads t t g)
+evalEvents :: (EProgram, [(String,Term)]) -> [[Status]]
+evalEvents ((EProgram (Just e) t), (g:gs)) = 
+  let thisT = (executeThreads t t g)
       t' = Data.List.map (\(_,newT)->newT) thisT
       s' = Data.List.map (\(newS,_)->newS) thisT
-  in [s']++(evalEvent ((EProgram (Just e) t'),gs))
-evalEvent ((EProgram (Just e) t), []) = []
+  in [s']++(evalEvents ((EProgram (Just e) t'),gs))
+evalEvents ((EProgram (Just e) t), []) = []
 
 evalInit :: TypedProgram -> (EProgram, [(String,Term)])
 evalInit (TypedProgram ged ct input t) = ((eval (Data.Map.empty) ct input 0 t),reverse ged)
